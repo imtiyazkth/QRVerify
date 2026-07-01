@@ -1,25 +1,5 @@
 /* ==========================================================================
-   QR VERIFY — APPLICATION LOGIC
-   "Know Before You Open"
-
-   100% vanilla JavaScript. No frameworks, no backend, no network calls
-   except the one-time CDN load of html5-qrcode / jsPDF declared in
-   index.html. All decoding and analysis below runs locally in the browser.
-
-   Module map:
-     1. State & DOM cache
-     2. Theme toggle
-     3. Tab switching (Camera / Upload)
-     4. Camera scanner   (html5-qrcode)
-     5. Image upload scanner (html5-qrcode scanFile)
-     6. QR content parser / classifier
-     7. Brand detector
-     8. Risk engine (offline heuristics)
-     9. Human-language explanation generator
-    10. Report rendering
-    11. Action utilities (copy / open / share / pdf / clear / rescan)
-    12. Bootstrap
-    13. Supported code formats + camera memory helpers
+   
    ========================================================================== */
 
 (function () {
