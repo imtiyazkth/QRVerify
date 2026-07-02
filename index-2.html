@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>QR Verify — Know Before You Open</title>
+<meta name="theme-color" content="#0b0f14">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#0b0f14; --bg2:#11161d; --card:#151b23; --card2:#1a212b;
+  --border:#232b36; --text:#eef2f6; --sub:#8b96a3; --accent:#2ee6a6;
+  --accent2:#1fb886; --green:#2ee6a6; --yellow:#f2c94c; --red:#ff5c5c;
+  --radius:18px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,Roboto,Segoe UI,Inter,sans-serif;
+  min-height:100vh;padding-bottom:96px;overflow-x:hidden}
+button{font-family:inherit;cursor:pointer}
+.hidden{display:none !important}
+
+/* ===== TOP BAR ===== */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 6px;}
+.brand{font-weight:700;font-size:18px;letter-spacing:.2px}
+.brand span{color:var(--accent)}
+.privacy-pill{font-size:11px;color:var(--sub);border:1px solid var(--border);padding:5px 10px;border-radius:20px;display:flex;gap:6px;align-items:center}
+
+/* ===== SCAN VIEW ===== */
+.scan-wrap{position:relative;padding:10px 14px 0}
+.scan-title{text-align:center;color:var(--sub);font-size:13px;margin-bottom:14px;padding:0 10px}
+
+.camera-frame{position:relative;width:100%;max-width:420px;margin:0 auto;aspect-ratio:1/1.05;border-radius:20px;overflow:hidden;background:#000;}
+#reader{width:100%;height:100%;}
+#reader video{width:100% !important;height:100% !important;object-fit:cover;}
+.scan-corners{position:absolute;inset:0;pointer-events:none}
+.corner{position:absolute;width:34px;height:34px;border:4px solid var(--green);border-radius:6px}
+.corner.tl{top:8%;left:6%;border-right:none;border-bottom:none}
+.corner.tr{top:8%;right:6%;border-left:none;border-bottom:none}
+.corner.bl{bottom:8%;left:6%;border-right:none;border-top:none}
+.corner.br{bottom:8%;right:6%;border-left:none;border-top:none}
+.scan-line{position:absolute;left:6%;right:6%;top:45%;height:2px;background:linear-gradient(90deg,transparent,var(--green),transparent);animation:sweep 2.2s ease-in-out infinite}
+@keyframes sweep{0%,100%{top:12%}50%{top:82%}}
+
+.scan-controls{display:flex;align-items:center;justify-content:space-between;max-width:420px;margin:14px auto 0;padding:0 10px}
+.side-btns{display:flex;gap:10px}
+.icon-btn{width:52px;height:52px;border-radius:50%;background:var(--card2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text)}
+.shutter{width:66px;height:66px;border-radius:50%;background:var(--green);border:none;display:flex;align-items:center;justify-content:center}
+.shutter svg{width:26px;height:26px}
+
+/* ===== BOTTOM NAV ===== */
+.bottomnav{position:fixed;bottom:0;left:0;right:0;background:rgba(17,22,29,.97);backdrop-filter:blur(10px);
+  border-top:1px solid var(--border);display:flex;justify-content:space-around;padding:10px 4px 14px;z-index:50}
+.navitem{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;color:var(--sub);font-size:11px;flex:1}
+.navitem.active{color:var(--green)}
+.navitem svg{width:22px;height:22px}
+
+/* ===== RESULT SHEET ===== */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:80;display:flex;align-items:flex-end}
+.sheet{background:var(--bg2);width:100%;max-height:88vh;overflow-y:auto;border-radius:22px 22px 0 0;padding:20px 18px 26px;
+  animation:slideup .25s ease-out}
+@keyframes slideup{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.sheet-head h2{margin:0;font-size:22px}
+.close-x{background:none;border:none;color:var(--sub);font-size:22px}
+
+.type-row{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.type-icon{width:46px;height:46px;border-radius:12px;background:var(--card);display:flex;align-items:center;justify-content:center;color:var(--green);flex-shrink:0}
+.type-icon svg{width:22px;height:22px}
+.type-label{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px}
+.type-domain{font-size:19px;font-weight:700;word-break:break-all}
+
+.mono-box{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;font-family:JetBrains Mono,monospace;
+  font-size:13px;color:var(--green);word-break:break-all;line-height:1.5;margin-bottom:16px}
+
+.meta-row{display:flex;justify-content:space-between;padding:12px 2px;border-bottom:1px solid var(--border);font-size:14px}
+.meta-row:last-of-type{border-bottom:none}
+.meta-row span:first-child{color:var(--sub)}
+
+.risk-btn{width:100%;margin:16px 0;padding:14px;border-radius:14px;border:none;background:linear-gradient(135deg,var(--green),var(--accent2));
+  color:#04241a;font-weight:700;font-size:15px;display:flex;align-items:center;justify-content:center;gap:8px}
+
+.risk-panel{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px;margin:12px 0;text-align:center}
+.gauge{width:140px;height:140px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;position:relative}
+.gauge-inner{width:106px;height:106px;border-radius:50%;background:var(--card);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.gauge-inner b{font-size:26px}
+.gauge-inner span{font-size:11px;color:var(--sub)}
+.risk-verdict{font-weight:700;font-size:17px;margin-bottom:6px}
+.risk-reasons{text-align:left;font-size:13px;color:var(--sub);margin-top:10px;line-height:1.6}
+.risk-reasons li{margin-bottom:4px}
+
+.action-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}
+.action-btn{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 4px;display:flex;flex-direction:column;
+  align-items:center;gap:6px;color:var(--text);font-size:11px}
+.action-btn svg{width:20px;height:20px;color:var(--green)}
+
+/* ===== GENERATE VIEW ===== */
+.gen-wrap{padding:16px}
+.gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.gen-tile{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 12px;display:flex;flex-direction:column;
+  align-items:flex-start;gap:8px;color:var(--text)}
+.gen-tile.active{border-color:var(--green);background:var(--card2)}
+.gen-tile svg{width:22px;height:22px;color:var(--green)}
+.gen-tile b{font-size:14px}
+.gen-tile small{color:var(--sub);font-size:11px}
+
+.field{margin-bottom:12px}
+.field label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px}
+.field input,.field textarea,.field select{width:100%;background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:12px;color:var(--text);font-size:14px}
+.field textarea{min-height:80px;resize:vertical}
+
+.platform-row{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:10px 12px;margin-bottom:8px}
+.platform-row svg{width:20px;height:20px;flex-shrink:0}
+.platform-row input[type=checkbox]{width:18px;height:18px;accent-color:var(--green)}
+.platform-row input[type=text]{flex:1;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;
+  color:var(--text);font-size:13px}
+
+.primary-btn{width:100%;padding:15px;border-radius:14px;border:none;background:var(--green);color:#04241a;font-weight:700;
+  font-size:15px;margin-top:8px}
+.secondary-btn{width:100%;padding:14px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--text);
+  font-weight:600;font-size:14px;margin-top:10px}
+
+.qr-preview{background:#fff;border-radius:16px;padding:20px;display:flex;align-items:center;justify-content:center;margin:16px 0}
+.hint{font-size:12px;color:var(--sub);line-height:1.6;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px}
+.hint b{color:var(--text)}
+
+.placeholder-view{padding:60px 24px;text-align:center;color:var(--sub)}
+.placeholder-view svg{width:48px;height:48px;color:var(--border);margin-bottom:14px}
+
+/* ===== SETTINGS ===== */
+.settings-block{padding-top:6px}
+.settings-title{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px}
+.seg-control{display:flex;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:4px;gap:4px}
+.seg-btn{flex:1;padding:10px;border:none;background:transparent;border-radius:9px;color:var(--sub);font-weight:600;font-size:13px}
+.seg-btn.active{background:var(--green);color:#04241a}
+.accent-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.accent-swatch{width:32px;height:32px;border-radius:50%;border:2px solid transparent;padding:0}
+.accent-swatch.active{border-color:var(--text)}
+#customAccent{width:32px;height:32px;border-radius:50%;border:none;padding:0;background:none;overflow:hidden}
+
+/* ===== LIGHT THEME ===== */
+body.theme-light{
+  --bg:#f5f7fa; --bg2:#eef1f5; --card:#ffffff; --card2:#f0f3f7;
+  --border:#dde3ea; --text:#0b0f14; --sub:#5b6572;
+}
+body.theme-light .bottomnav{background:rgba(255,255,255,.97)}
+body.theme-light .install{color:#04241a}
+
+/* ===== FRAME OPTIONS / STUDIO PREVIEW ===== */
+.frame-options{display:flex;flex-direction:column;gap:8px}
+.frame-opt{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:12px 14px;font-size:14px;color:var(--text)}
+.frame-opt input{width:18px;height:18px;accent-color:var(--green)}
+.studio-label{font-size:12px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin:18px 0 10px}
+.studio-wrap{display:flex;justify-content:center;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px}
+#studioCanvas{max-width:100%;border-radius:10px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">QR<span>Verify</span></div>
+  <div class="privacy-pill">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5 2.5 3.6v3.7c0 3.5 2.3 6.7 5.5 7.7 3.2-1 5.5-4.2 5.5-7.7V3.6L8 1.5Z" stroke="currentColor" stroke-width="1.3"/></svg>
+    On-device only
+  </div>
+</div>
+
+<!-- ============ SCAN VIEW ============ -->
+<section id="view-scan">
+  <div class="scan-wrap">
+    <div class="scan-title">Scan with privacy — make your own judgement before opening any link</div>
+
+    <div class="camera-frame">
+      <div id="reader"></div>
+      <div class="scan-corners">
+        <div class="corner tl"></div><div class="corner tr"></div>
+        <div class="corner bl"></div><div class="corner br"></div>
+        <div class="scan-line"></div>
+      </div>
+    </div>
+
+    <div class="scan-controls">
+      <div class="side-btns">
+        <button class="icon-btn" id="flashBtn" title="Flash">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="flipBtn" title="Flip camera">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 2 21 6l-4 4M7 22 3 18l4-4M3 6a9 9 0 0 1 15.5-4M21 18a9 9 0 0 1-15.5 4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <button class="shutter" id="shutterBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#04241a" stroke-width="2"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+      </button>
+      <button class="icon-btn" id="galleryBtn" title="From gallery">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <input type="file" id="galleryInput" accept="image/*" class="hidden">
+    </div>
+  </div>
+</section>
+
+<!-- ============ GENERATE VIEW ============ -->
+<section id="view-generate" class="hidden">
+  <div class="gen-wrap">
+    <div id="genTypeGrid" class="gen-grid"></div>
+    <div id="genForm"></div>
+  </div>
+</section>
+
+<!-- ============ PLACEHOLDER VIEWS ============ -->
+<section id="view-settings" class="hidden">
+  <div class="gen-wrap">
+    <div class="settings-block">
+      <div class="settings-title">Appearance</div>
+      <div class="field">
+        <label>Theme Mode</label>
+        <div class="seg-control">
+          <button class="seg-btn" type="button" data-mode="dark">Dark</button>
+          <button class="seg-btn" type="button" data-mode="light">Light</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Accent Color</label>
+        <div class="accent-row">
+          <button class="accent-swatch" type="button" style="background:#2ee6a6" data-accent="#2ee6a6" title="Mint"></button>
+          <button class="accent-swatch" type="button" style="background:#4c8cf2" data-accent="#4c8cf2" title="Blue"></button>
+          <button class="accent-swatch" type="button" style="background:#f2874c" data-accent="#f2874c" title="Orange"></button>
+          <button class="accent-swatch" type="button" style="background:#c94cf2" data-accent="#c94cf2" title="Purple"></button>
+          <button class="accent-swatch" type="button" style="background:#f2c94c" data-accent="#f2c94c" title="Yellow"></button>
+          <input type="color" id="customAccent" value="#2ee6a6" title="Pick any color">
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ BOTTOM NAV ============ -->
+<nav class="bottomnav">
+  <button class="navitem active" data-view="scan">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v7M14 20h7"/></svg>
+    Scan
+  </button>
+  <button class="navitem" data-view="generate">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Generate
+  </button>
+  <button class="navitem" data-view="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>
+    Settings
+  </button>
+</nav>
+
+<!-- ============ RESULT SHEET (hidden by default) ============ -->
+<div id="resultOverlay" class="sheet-overlay hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>Scan Result</h2>
+      <button class="close-x" id="closeResult">✕</button>
+    </div>
+
+    <div class="type-row">
+      <div class="type-icon" id="resultIcon">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M6 8a2 2 0 0 0 2 2h1a2 2 0 1 0 0-4H8"/><path d="M10 8a2 2 0 0 0-2-2H7a2 2 0 1 0 0 4h1"/></svg>
+      </div>
+      <div>
+        <div class="type-label" id="resultLabel">LINK / URL</div>
+        <div class="type-domain" id="resultDomain">example.com</div>
+      </div>
+    </div>
+
+    <div class="mono-box" id="resultFull"></div>
+
+    <div class="meta-row"><span>Barcode Format</span><span id="resultFormat">QR_CODE</span></div>
+    <div class="meta-row"><span>Scanned Time</span><span id="resultTime">—</span></div>
+
+    <button class="risk-btn" id="riskBtn">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 6v6c0 5 4 8.5 9 10 5-1.5 9-5 9-10V6l-9-4Z"/></svg>
+      Run Security Risk Analysis
+    </button>
+
+    <div id="riskPanel" class="risk-panel hidden">
+      <div class="gauge" id="gauge">
+        <div class="gauge-inner"><b id="riskScore">0</b><span>/ 100</span></div>
+      </div>
+      <div class="risk-verdict" id="riskVerdict">—</div>
+      <ul class="risk-reasons" id="riskReasons"></ul>
+    </div>
+
+    <div class="action-grid">
+      <button class="action-btn" id="actOpen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6M10 14 21 3"/></svg>Open</button>
+      <button class="action-btn" id="actCopy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>Copy</button>
+      <button class="action-btn" id="actShare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 10.5 6.8-3.9M8.6 13.5l6.8 3.9"/></svg>Share</button>
+      <button class="action-btn" id="actDownload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>Download</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   NAVIGATION
+============================================================ */
+const views = ['scan','generate','settings'];
+document.querySelectorAll('.navitem').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const v = btn.dataset.view;
+    views.forEach(x=>document.getElementById('view-'+x).classList.toggle('hidden', x!==v));
+    document.querySelectorAll('.navitem').forEach(b=>b.classList.toggle('active', b===btn));
+    if(v==='scan') startScanner(); else stopScanner();
+  });
+});
+
+/* ============================================================
+   SCANNER
+============================================================ */
+let html5QrCode, scanning=false, currentCamera='environment';
+function startScanner(){
+  if(scanning) return;
+  html5QrCode = new Html5Qrcode("reader");
+  Html5Qrcode.getCameras().then(cams=>{
+    if(!cams || !cams.length) return;
+    html5QrCode.start(
+      {facingMode: currentCamera},
+      {fps:10, qrbox:{width:230,height:230}},
+      decodedText=>{ onScanSuccess(decodedText); },
+      ()=>{}
+    ).then(()=>scanning=true).catch(()=>{});
+  }).catch(()=>{});
+}
+function stopScanner(){
+  if(html5QrCode && scanning){
+    html5QrCode.stop().then(()=>{scanning=false;}).catch(()=>{scanning=false;});
+  }
+}
+document.getElementById('flipBtn').addEventListener('click',()=>{
+  currentCamera = currentCamera==='environment' ? 'user' : 'environment';
+  stopScanner(); setTimeout(startScanner,300);
+});
+document.getElementById('flashBtn').addEventListener('click',()=>{
+  if(html5QrCode && scanning){
+    html5QrCode.applyVideoConstraints({advanced:[{torch:true}]}).catch(()=>{});
+  }
+});
+document.getElementById('galleryBtn').addEventListener('click',()=>document.getElementById('galleryInput').click());
+document.getElementById('galleryInput').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const tmp = new Html5Qrcode("reader");
+  tmp.scanFile(file, true).then(text=>onScanSuccess(text)).catch(()=>alert('No QR code found in image.'));
+});
+document.getElementById('shutterBtn').addEventListener('click',()=>{
+  // manual capture not needed with continuous scan; kept for UI parity
+});
+
+window.addEventListener('load', startScanner);
+
+/* ============================================================
+   RESULT SHEET
+============================================================ */
+let lastScanned = '';
+function onScanSuccess(text){
+  if(text === lastScanned) return; // avoid duplicate triggers
+  lastScanned = text;
+  stopScanner();
+  showResult(text);
+  setTimeout(()=>{ lastScanned=''; }, 1500);
+}
+
+function classify(text){
+  try{
+    if(/^https?:\/\//i.test(text)){
+      const u = new URL(text);
+      return {type:'url', label:'LINK / URL', domain:u.hostname};
+    }
+  }catch(e){}
+  if(/^WIFI:/i.test(text)) return {type:'wifi', label:'WI-FI NETWORK', domain:(text.match(/S:([^;]*)/)||[])[1]||'Network'};
+  if(/^BEGIN:VCARD/i.test(text)) return {type:'vcard', label:'CONTACT CARD', domain:'vCard'};
+  if(/^mailto:/i.test(text)) return {type:'email', label:'EMAIL', domain:text.replace('mailto:','')};
+  if(/^tel:/i.test(text)) return {type:'tel', label:'PHONE NUMBER', domain:text.replace('tel:','')};
+  return {type:'text', label:'PLAIN TEXT', domain: text.length>40? text.slice(0,40)+'…' : text};
+}
+
+function showResult(text){
+  const c = classify(text);
+  document.getElementById('resultLabel').textContent = c.label;
+  document.getElementById('resultDomain').textContent = c.domain;
+  document.getElementById('resultFull').textContent = text;
+  document.getElementById('resultFormat').textContent = 'QR_CODE';
+  document.getElementById('resultTime').textContent = new Date().toLocaleTimeString();
+  document.getElementById('riskPanel').classList.add('hidden');
+  document.getElementById('resultOverlay').classList.remove('hidden');
+  document.getElementById('resultOverlay').dataset.payload = text;
+  document.getElementById('resultOverlay').dataset.type = c.type;
+}
+document.getElementById('closeResult').addEventListener('click',()=>{
+  document.getElementById('resultOverlay').classList.add('hidden');
+  startScanner();
+});
+
+document.getElementById('actCopy').addEventListener('click',()=>{
+  navigator.clipboard.writeText(document.getElementById('resultOverlay').dataset.payload).then(()=>alert('Copied to clipboard'));
+});
+document.getElementById('actShare').addEventListener('click',()=>{
+  const text = document.getElementById('resultOverlay').dataset.payload;
+  if(navigator.share) navigator.share({text}).catch(()=>{});
+  else alert('Sharing not supported on this browser');
+});
+document.getElementById('actOpen').addEventListener('click',()=>{
+  const payload = document.getElementById('resultOverlay').dataset.payload;
+  if(/^https?:\/\//i.test(payload)) window.open(payload,'_blank');
+  else alert('This content type cannot be opened directly.');
+});
+document.getElementById('actDownload').addEventListener('click',()=>{
+  const payload = document.getElementById('resultOverlay').dataset.payload;
+  const blob = new Blob([payload], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = 'qr-result.txt'; a.click();
+});
+
+/* ============================================================
+   RISK ANALYSIS ENGINE (heuristic, fully offline)
+============================================================ */
+document.getElementById('riskBtn').addEventListener('click',()=>{
+  const payload = document.getElementById('resultOverlay').dataset.payload;
+  const type = document.getElementById('resultOverlay').dataset.type;
+  const result = analyzeRisk(payload, type);
+  renderRisk(result);
+});
+
+const SHORTENERS = ['bit.ly','tinyurl.com','t.co','goo.gl','ow.ly','is.gd','buff.ly','rebrand.ly','cutt.ly','shorturl.at'];
+const SUSPICIOUS_TLDS = ['.zip','.mov','.xyz','.top','.tk','.gq','.ml','.cf','.click','.link'];
+
+function analyzeRisk(text, type){
+  let score = 0; const reasons = [];
+
+  if(type !== 'url'){
+    if(type==='wifi'){ score+=5; reasons.push('WiFi payload — verify the network name is one you recognise.'); }
+    else if(type==='text'){ score+=5; reasons.push('Plain text payload — low inherent risk.'); }
+    else { score+=8; reasons.push('Non-link payload — review content before acting on it.'); }
+    return {score, reasons, level: levelFor(score)};
+  }
+
+  let u;
+  try{ u = new URL(text); }catch(e){ score=70; reasons.push('Malformed URL structure.'); return {score,reasons,level:levelFor(score)}; }
+
+  if(u.protocol !== 'https:'){ score+=25; reasons.push('Not using HTTPS — traffic may be unencrypted.'); }
+  if(/^\d{1,3}(\.\d{1,3}){3}$/.test(u.hostname)){ score+=30; reasons.push('Destination is a raw IP address, not a domain.'); }
+  if(u.username || u.password || text.includes('@') && text.indexOf('@') < text.indexOf(u.hostname)){ score+=20; reasons.push('URL contains an "@" trick that can hide the real destination.'); }
+  if(SHORTENERS.some(s=>u.hostname.includes(s))){ score+=25; reasons.push('Uses a link-shortening service, which hides the final destination.'); }
+  if(SUSPICIOUS_TLDS.some(t=>u.hostname.endsWith(t))){ score+=20; reasons.push('Uses a top-level domain often associated with abuse ('+u.hostname.slice(u.hostname.lastIndexOf('.'))+').'); }
+  if(u.hostname.startsWith('xn--') || u.hostname.includes('xn--')){ score+=25; reasons.push('Punycode/IDN domain — can visually impersonate a trusted brand.'); }
+  const subdomainCount = u.hostname.split('.').length - 2;
+  if(subdomainCount >= 3){ score+=15; reasons.push('Unusually many subdomains, a common cloaking technique.'); }
+  if(/-/.test(u.hostname) && /(login|secure|verify|account|update|bank|paypal)/i.test(u.hostname)){ score+=20; reasons.push('Domain mimics security/login language often used in phishing.'); }
+  if(text.length > 150){ score+=10; reasons.push('Very long URL with many parameters — harder to verify.'); }
+  if(u.hostname.split('.').pop().length > 4){ score+=5; reasons.push('Unusual top-level domain length.'); }
+
+  score = Math.min(100, score);
+  if(reasons.length===0) reasons.push('No obvious red flags detected in the URL structure.');
+  return {score, reasons, level: levelFor(score)};
+}
+function levelFor(score){
+  if(score < 30) return 'low';
+  if(score < 60) return 'medium';
+  return 'high';
+}
+
+function renderRisk(r){
+  const panel = document.getElementById('riskPanel');
+  panel.classList.remove('hidden');
+  document.getElementById('riskScore').textContent = r.score;
+  const colors = {low:'var(--green)', medium:'var(--yellow)', high:'var(--red)'};
+  const verdictText = {low:'Low Risk — looks safe', medium:'Medium Risk — proceed with caution', high:'High Risk — avoid opening'};
+  document.getElementById('riskVerdict').textContent = verdictText[r.level];
+  document.getElementById('riskVerdict').style.color = colors[r.level];
+  document.getElementById('gauge').style.background =
+    `conic-gradient(${colors[r.level]} ${r.score*3.6}deg, var(--border) 0deg)`;
+  const ul = document.getElementById('riskReasons');
+  ul.innerHTML = r.reasons.map(x=>`<li>${x}</li>`).join('');
+}
+
+/* ============================================================
+   GENERATE VIEW
+============================================================ */
+const genTypes = [
+  {id:'url', name:'Website / Link', icon:'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1'},
+  {id:'text', name:'Plain Text', icon:'M4 6h16M4 12h16M4 18h10'},
+  {id:'wifi', name:'WiFi Network', icon:'M5 12.5a11 11 0 0 1 14 0M8 16a6 6 0 0 1 8 0M12 19.5h.01'},
+  {id:'vcard', name:'Contact (vCard)', icon:'M4 4h16v16H4zM8 10h8M8 14h5'},
+  {id:'social', name:'Social Media Hub', icon:'M18 8a3 3 0 1 0-2.8-4M6 8a3 3 0 1 0 2.8-4M6 16a3 3 0 1 0 2.8 4M18 16a3 3 0 1 0-2.8 4M8.7 7.3l6.6-2.6M8.7 16.7l6.6 2.6'},
+];
+const genGrid = document.getElementById('genTypeGrid');
+genTypes.forEach(t=>{
+  const el = document.createElement('button');
+  el.className='gen-tile';
+  el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="${t.icon}" stroke-linecap="round" stroke-linejoin="round"/></svg><b>${t.name}</b><small>Tap to configure</small>`;
+  el.addEventListener('click',()=>{
+    document.querySelectorAll('.gen-tile').forEach(x=>x.classList.remove('active'));
+    el.classList.add('active');
+    renderGenForm(t.id);
+  });
+  genGrid.appendChild(el);
+});
+
+function renderGenForm(type){
+  const f = document.getElementById('genForm');
+  if(type==='url'){
+    f.innerHTML = `
+      <div class="field"><label>Website URL</label><input id="inUrl" type="url" placeholder="https://example.com"></div>
+      <button class="primary-btn" onclick="genQR(document.getElementById('inUrl').value)">Generate QR Code</button>
+      <div id="qrOut"></div>`;
+  } else if(type==='text'){
+    f.innerHTML = `
+      <div class="field"><label>Text content</label><textarea id="inText" placeholder="Enter any text"></textarea></div>
+      <button class="primary-btn" onclick="genQR(document.getElementById('inText').value)">Generate QR Code</button>
+      <div id="qrOut"></div>`;
+  } else if(type==='wifi'){
+    f.innerHTML = `
+      <div class="field"><label>Network name (SSID)</label><input id="inSsid" type="text"></div>
+      <div class="field"><label>Password</label><input id="inPass" type="text"></div>
+      <div class="field"><label>Security</label><select id="inSec"><option value="WPA">WPA/WPA2</option><option value="WEP">WEP</option><option value="nopass">None</option></select></div>
+      <button class="primary-btn" onclick="genWifi()">Generate QR Code</button>
+      <div id="qrOut"></div>`;
+  } else if(type==='vcard'){
+    f.innerHTML = `
+      <div class="field"><label>Full name</label><input id="inName" type="text"></div>
+      <div class="field"><label>Phone</label><input id="inPhone" type="tel"></div>
+      <div class="field"><label>Email</label><input id="inEmail" type="email"></div>
+      <div class="field"><label>Organization</label><input id="inOrg" type="text"></div>
+      <button class="primary-btn" onclick="genVcard()">Generate QR Code</button>
+      <div id="qrOut"></div>`;
+  } else if(type==='social'){
+    f.innerHTML = `
+      <div class="hint"><b>How this works:</b> paste any social media link — Instagram, YouTube, WhatsApp, X, LinkedIn, Telegram, Discord, Reddit, or anything else — and we'll generate a QR code that opens it directly. No hosting or extra setup needed.</div>
+      <div class="field" style="margin-top:14px"><label>Social Media Link</label><input id="inSocial" type="url" placeholder="Paste any social media URL, e.g. https://instagram.com/username"></div>
+      <button class="primary-btn" onclick="genQR(document.getElementById('inSocial').value)">Generate QR Code</button>
+      <div id="qrOut"></div>`;
+  }
+}
+renderGenForm('url');
+document.querySelector('.gen-tile').classList.add('active');
+
+const QR_SIZE = 260;
+function genQR(text){
+  if(!text){ alert('Please fill in the required field.'); return; }
+  const out = document.getElementById('qrOut');
+  out.innerHTML = `
+    <div class="qr-preview" id="qrBox" style="display:none"></div>
+    <div class="field" style="margin-top:16px">
+      <label>4. Wrap in Call-to-Action Frame</label>
+      <div class="frame-options">
+        <label class="frame-opt"><input type="radio" name="frameOpt" value="none" checked> No Frame (Just QR Code)</label>
+        <label class="frame-opt"><input type="radio" name="frameOpt" value="border"> Border Outer Outline Frame</label>
+        <label class="frame-opt"><input type="radio" name="frameOpt" value="banner"> "Scan Me" Bottom Tag Banner</label>
+      </div>
+    </div>
+    <div class="studio-label">Live Studio Preview</div>
+    <div class="studio-wrap"><canvas id="studioCanvas"></canvas></div>
+    <button class="secondary-btn" id="dlQr">Download PNG</button>`;
+  new QRCode(document.getElementById('qrBox'), {text, width:QR_SIZE, height:QR_SIZE, colorDark:'#0b0f14', colorLight:'#ffffff'});
+  // qrcodejs paints synchronously to a canvas, but give it one tick to be safe
+  setTimeout(renderStudioPreview, 30);
+  document.querySelectorAll('input[name="frameOpt"]').forEach(r=>r.addEventListener('change', renderStudioPreview));
+  document.getElementById('dlQr').addEventListener('click', downloadStudioPNG);
+}
+
+function getQRSourceEl(){
+  return document.querySelector('#qrBox canvas') || document.querySelector('#qrBox img');
+}
+
+function renderStudioPreview(){
+  const src = getQRSourceEl();
+  const canvas = document.getElementById('studioCanvas');
+  if(!src || !canvas) return;
+  const frame = (document.querySelector('input[name="frameOpt"]:checked')||{}).value || 'none';
+  let W, H, qy;
+  if(frame==='border'){ W=QR_SIZE+64; H=QR_SIZE+64; }
+  else if(frame==='banner'){ W=QR_SIZE+40; H=QR_SIZE+110; }
+  else { W=QR_SIZE+40; H=QR_SIZE+40; }
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,W,H);
+  const qx = (W-QR_SIZE)/2;
+  qy = frame==='banner' ? 20 : (H-QR_SIZE)/2;
+  if(frame==='border'){
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#2ee6a6';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(12,12,W-24,H-24);
+  }
+  ctx.drawImage(src, qx, qy, QR_SIZE, QR_SIZE);
+  if(frame==='banner'){
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--green').trim() || '#2ee6a6';
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, H-70, W, 70);
+    ctx.fillStyle = '#04241a';
+    ctx.font = 'bold 26px -apple-system, Roboto, Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SCAN ME', W/2, H-35);
+  }
+}
+
+function downloadStudioPNG(){
+  const canvas = document.getElementById('studioCanvas');
+  if(!canvas){ return; }
+  canvas.toBlob(blob=>{
+    if(!blob){ alert('Could not generate the image. Please try again.'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'qrcode.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(url), 2000);
+  }, 'image/png');
+}
+function genWifi(){
+  const ssid=document.getElementById('inSsid').value, pass=document.getElementById('inPass').value, sec=document.getElementById('inSec').value;
+  genQR(`WIFI:T:${sec};S:${ssid};P:${pass};;`);
+}
+function genVcard(){
+  const n=document.getElementById('inName').value, p=document.getElementById('inPhone').value,
+        e=document.getElementById('inEmail').value, o=document.getElementById('inOrg').value;
+  genQR(`BEGIN:VCARD\nVERSION:3.0\nFN:${n}\nORG:${o}\nTEL:${p}\nEMAIL:${e}\nEND:VCARD`);
+}
+
+/* ============================================================
+   SETTINGS — THEME MODE + ACCENT COLOR
+============================================================ */
+function applyAccent(color){
+  document.documentElement.style.setProperty('--accent', color);
+  document.documentElement.style.setProperty('--accent2', color);
+  document.documentElement.style.setProperty('--green', color);
+  localStorage.setItem('qrverify_accent', color);
+  document.querySelectorAll('.accent-swatch').forEach(b=>b.classList.toggle('active', b.dataset.accent===color));
+  const customInput = document.getElementById('customAccent');
+  if(customInput) customInput.value = color;
+  renderStudioPreview();
+}
+function applyMode(mode){
+  document.body.classList.toggle('theme-light', mode==='light');
+  document.querySelectorAll('.seg-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  localStorage.setItem('qrverify_mode', mode);
+}
+document.querySelectorAll('.seg-btn').forEach(b=>b.addEventListener('click',()=>applyMode(b.dataset.mode)));
+document.querySelectorAll('.accent-swatch').forEach(b=>b.addEventListener('click',()=>applyAccent(b.dataset.accent)));
+const customAccentInput = document.getElementById('customAccent');
+if(customAccentInput) customAccentInput.addEventListener('input', e=>applyAccent(e.target.value));
+
+(function initTheme(){
+  const mode = localStorage.getItem('qrverify_mode') || 'dark';
+  const accent = localStorage.getItem('qrverify_accent') || '#2ee6a6';
+  applyMode(mode);
+  applyAccent(accent);
+})();
+</script>
+</body>
+</html>
